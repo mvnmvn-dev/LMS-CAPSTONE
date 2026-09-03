@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block page_subtitle %}
+<p class="page-header-subtitle">
+    <span><i class="fas fa-chart-pie"></i> System-wide analytics</span>
+    <span id="reports-live-status" class="reports-live-status">Loading live data…</span>
+</p>
+{% endblock %}
+
+{% block page_actions %}
+<button type="button" id="reports-refresh-btn" class="btn-secondary" title="Refresh now">
+    <i class="fas fa-rotate"></i> Refresh
+</button>
+{% if has_perm('reports.manage') %}
+<a href="{{ url_for('analytics.export', format='csv') }}" class="btn-secondary">
+    <i class="fas fa-file-csv"></i> Export CSV
+</a>
+<a href="{{ url_for('analytics.export', format='html') }}" class="btn-secondary">
+    <i class="fas fa-file-lines"></i> Export HTML Report
+</a>
+{% endif %}
+<button type="button" class="btn-primary-square" onclick="window.print()">
+    <i class="fas fa-print"></i> Print
+</button>
+{% endblock %}
+
+{% block content %}
+
+<div class="dashboard-stats grid-4 mb-6">
+    <div class="stat-card stat-indigo">
+        <div class="stat-card-inner">
+            <div class="stat-icon indigo"><i class="fas fa-book-open"></i></div>
+            <div class="stat-body">
+                <p class="stat-label">Total Books</p>
+                <p class="stat-value indigo" id="stat-total-books">{{ summary.dashboard.total_books }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="stat-card stat-amber">
+        <div class="stat-card-inner">
+            <div class="stat-icon amber"><i class="fas fa-right-left"></i></div>
+            <div class="stat-body">
+                <p class="stat-label">Active Loans</p>
+                <p class="stat-value amber" id="stat-active-loans">{{ summary.dashboard.active_loans }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="stat-card stat-red">
+        <div class="stat-card-inner">
+            <div class="stat-icon red"><i class="fas fa-exclamation-circle"></i></div>
+            <div class="stat-body">
+                <p class="stat-label">Overdue</p>
+                <p class="stat-value red" id="stat-overdue-loans">{{ summary.dashboard.overdue_loans }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="stat-card stat-emerald">
+        <div class="stat-card-inner">
+            <div class="stat-icon emerald"><i class="fas fa-peso-sign"></i></div>
+            <div class="stat-body">
+                <p class="stat-label">Unpaid Fines</p>
+                <p class="stat-value emerald" id="stat-unpaid-fines">₱{{ '%.2f'|format(summary.dashboard.unpaid_fines_total) }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-card insights-panel mb-6">
+    <div class="page-card-header">
+        <span class="page-card-header-icon indigo"><i class="fas fa-lightbulb"></i></span>
+        <span>Analysis &amp; Insights</span>
+    </div>
+    <div class="insights-grid" id="insights-grid">
+        {% for insight in summary.analysis %}
+        <div class="insight-card">
+            <span class="insight-module-tag">{{ insight.module }}</span>
+            <h3 class="insight-title">{{ insight.title }}</h3>
+            <p class="insight-text">{{ insight.text }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="chart-grid mb-6">
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-right-left"></i> Borrowing — Status</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-borrowing"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-chart-line"></i> Borrowing — Monthly Trend</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-borrowing-trend"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-bookmark"></i> Reservations</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-reservations"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-clock"></i> Fines by Amount</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-fines"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-coins"></i> Fine Revenue Trend</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-revenue"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-boxes-stacked"></i> Inventory Status</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-inventory"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-tags"></i> Genre Distribution</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-genres"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-tablet-screen-button"></i> E-Book Formats</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-ebooks"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-clipboard-check"></i> Library Clearance</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-clearance"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-triangle-exclamation"></i> Lost / Damaged</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-lost-damaged"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-users"></i> Users by Role</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-users"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-bolt"></i> Peak Usage Hours</div>
+        <div class="chart-canvas-wrap"><canvas id="chart-peak"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-wide">
+        <div class="chart-card-header"><i class="fas fa-list-check"></i> Module Activity Events</div>
+        <div class="chart-canvas-wrap chart-canvas-tall"><canvas id="chart-events"></canvas></div>
+    </div>
+</div>
+
+<div class="dashboard-grid grid-2">
+    <div class="page-card dashboard-table-card">
+        <div class="page-card-header">
+            <span class="page-card-header-icon indigo"><i class="fas fa-chart-bar"></i></span>
+            <span>Most Borrowed Titles</span>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table data-table-compact">
+                <thead><tr><th>Title</th><th class="text-right">Borrows</th></tr></thead>
+                <tbody id="most-borrowed-body">
+                    {% for item in summary.dashboard.most_borrowed %}
+                    <tr>
+                        <td>
+                            <div class="table-title-cell">
+                                <span class="rank-badge">{{ loop.index }}</span>
+                                <span>{{ item.title }}</span>
+                            </div>
+                        </td>
+                        <td class="text-right"><span class="count-pill">{{ item.borrow_count }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2" class="empty-cell compact"><p>No data yet</p></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="page-card dashboard-table-card">
+        <div class="page-card-header">
+            <span class="page-card-header-icon amber"><i class="fas fa-clock-rotate-left"></i></span>
+            <span>Recent System Activity</span>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table data-table-compact">
+                <thead><tr><th>Event</th><th>Time</th></tr></thead>
+                <tbody id="recent-activity-body">
+                    {% for act in summary.dashboard.recent_activity %}
+                    <tr>
+                        <td>
+                            <div class="activity-cell">
+                                <span class="activity-dot"></span>
+                                <span class="activity-event">{{ act.event_type|replace('_', ' ')|capitalize }}</span>
+                            </div>
+                        </td>
+                        <td class="text-muted activity-time">{{ act.created_at.strftime('%b %d, %Y %I:%M %p') if act.created_at else '' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2" class="empty-cell compact"><p>No activity yet</p></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

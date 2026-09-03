@@ -1,0 +1,517 @@
+{% extends "base.html" %}
+{% from 'macros/book.html' import book_cover %}
+{% from 'macros/avatar.html' import user_avatar %}
+{% block title %}Dashboard - LMS{% endblock %}
+{% block page_actions %}
+<a href="{{ url_for('search.index') }}" class="btn-primary-square">
+    <i class="fas fa-search"></i> Search Books
+</a>
+<a href="{{ url_for('borrowing.index') }}" class="btn-secondary">
+    <i class="fas fa-right-left"></i> Borrowing Logs
+</a>
+{% if has_perm('inventory.view') %}
+<a href="{{ url_for('inventory.index') }}" class="btn-secondary">
+    <i class="fas fa-book-open"></i> Manage Inventory
+</a>
+{% endif %}
+{% if has_perm('reports.view') %}
+<a href="{{ url_for('analytics.index') }}" class="btn-secondary">
+    <i class="fas fa-chart-line"></i> Reports &amp; Analytics
+</a>
+{% endif %}
+{% endblock %}
+{% block content %}
+
+<div class="welcome-hero">
+    <div class="welcome-hero-content">
+        <h2 class="welcome-hero-title" id="welcome-hero-title">Welcome back!</h2>
+        <p class="welcome-hero-subtitle">
+            {% if current_user.role == 'patron' %}
+            Your personal library hub — loans, holds, fines, and e-books for <strong>{{ current_user.full_name }}</strong>.
+            {% elif current_user.role == 'admin' %}
+            System overview and administration tools for <strong>{{ current_user.full_name }}</strong>.
+            {% else %}
+            Day-to-day library operations for <strong>{{ current_user.full_name }}</strong>.
+            {% endif %}
+        </p>
+        <span class="welcome-hero-badge">
+            <i class="fas fa-id-card"></i> {{ current_user.library_id }}
+        </span>
+    </div>
+    <div class="welcome-hero-stats">
+        {% if current_user.role == 'patron' %}
+        <div class="hero-stat-pill">
+            <span class="hero-stat-value">{{ stats.my_active_loans }}</span>
+            <span class="hero-stat-label">My Loans</span>
+        </div>
+        <div class="hero-stat-pill">
+            <span class="hero-stat-value">{{ stats.my_reservations }}</span>
+            <span class="hero-stat-label">Holds</span>
+        </div>
+        <div class="hero-stat-pill">
+            <span class="hero-stat-value">₱{{ '%.0f'|format(stats.my_unpaid_fines) }}</span>
+            <span class="hero-stat-label">Fines</span>
+        </div>
+        {% else %}
+        <div class="hero-stat-pill">
+            <span class="hero-stat-value">{{ stats.active_loans }}</span>
+            <span class="hero-stat-label">Active Loans</span>
+        </div>
+        <div class="hero-stat-pill">
+            <span class="hero-stat-value">{{ stats.pending_reservations }}</span>
+            <span class="hero-stat-label">Holds</span>
+        </div>
+        <div class="hero-stat-pill">
+            <span class="hero-stat-value">{{ stats.overdue_loans }}</span>
+            <span class="hero-stat-label">Overdue</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="dashboard-stats grid-4 mb-6">
+    {% for card in stats.kpi_cards %}
+    <div class="stat-card stat-{{ card.theme }}">
+        <div class="stat-card-inner">
+            <div class="stat-icon {{ card.theme }}"><i class="fas {{ card.icon }}"></i></div>
+            <div class="stat-body">
+                <p class="stat-label">{{ card.label }}{% if card.hint %} <span class="kpi-hint">({{ card.hint }})</span>{% endif %}</p>
+                <p class="stat-value {{ card.theme }}" data-count="{{ card.count }}">
+                    {% if card.format == 'currency' %}₱{{ '%.2f'|format(card.value) }}{% else %}{{ card.value }}{% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if extras.spotlight %}
+<div class="spotlight-card mb-6">
+    <div class="spotlight-cover">{{ book_cover(extras.spotlight, 'md') }}</div>
+    <div class="spotlight-body">
+        <span class="spotlight-label"><i class="fas fa-star"></i> {{ extras.spotlight.label or 'Staff Pick' }}</span>
+        <h3 class="spotlight-title">{{ extras.spotlight.title }}</h3>
+        <p class="spotlight-meta">{{ extras.spotlight.authors or 'Unknown author' }}{% if extras.spotlight.genre %} · {{ extras.spotlight.genre }}{% endif %}</p>
+        {% if extras.spotlight.note %}<p class="spotlight-note">{{ extras.spotlight.note }}</p>{% endif %}
+        <a href="{{ url_for('search.index', book=extras.spotlight.book_id) }}" class="btn-primary-square btn-sm">
+            <i class="fas fa-book-open"></i> View Book
+        </a>
+        {% if current_user.role in ['staff', 'admin'] %}
+        <button type="button" class="btn-secondary btn-sm" data-open-modal="spotlight-modal" style="margin-left:0.5rem;">
+            <i class="fas fa-pen"></i> Set Pick
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if extras.continue_reading %}
+<div class="continue-reading-card mb-6">
+    <div class="continue-reading-info">
+        <p class="continue-reading-label"><i class="fas fa-book-reader"></i> Continue Reading</p>
+        <h3 class="continue-reading-title">{{ extras.continue_reading.title }}</h3>
+        <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" style="width: {{ extras.continue_reading.progress_pct }}%;"></div>
+        </div>
+        <span class="progress-bar-label">{{ extras.continue_reading.progress_pct }}% complete</span>
+    </div>
+    <a href="{{ url_for('ebooks.reader', access_id=extras.continue_reading.access_id) }}" class="btn-primary-square">
+        <i class="fas fa-play"></i> Resume
+    </a>
+</div>
+{% endif %}
+
+{% if extras.due_soon %}
+<div class="due-soon-card mb-6">
+    <div class="section-header" style="margin-bottom: 0.75rem;">
+        <h2 class="section-title" style="font-size: 1rem;"><i class="fas fa-clock"></i> Due Soon</h2>
+    </div>
+    <div class="due-soon-list">
+        {% for loan in extras.due_soon %}
+        <div class="due-soon-item">
+            <div>
+                <strong>{{ loan.title }}</strong>
+                <span class="due-chip due-{{ loan.due_urgency }}">
+                    {% if loan.due_urgency == 'overdue' %}Overdue{% elif loan.due_urgency == 'soon' %}Due in {{ loan.days_remaining }}d{% elif loan.due_urgency == 'warning' %}{{ loan.days_remaining }} days left{% else %}Due {{ loan.due_date }}{% endif %}
+                </span>
+            </div>
+            <a href="{{ url_for('borrowing.index') }}" class="btn-action">View</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="quick-actions-section">
+    <div class="section-header" style="margin-bottom: 0.75rem;">
+        <h2 class="section-title" style="font-size: 1rem;">Quick Actions</h2>
+    </div>
+    <div class="quick-actions-grid">
+        {% if has_perm('search.view') %}
+        <a href="{{ url_for('search.index') }}" class="quick-action-tile">
+            <span class="quick-action-icon search"><i class="fas fa-search"></i></span>
+            <span class="quick-action-label">Search Books</span>
+        </a>
+        {% endif %}
+        <a href="{{ url_for('borrowing.index') }}" class="quick-action-tile">
+            <span class="quick-action-icon borrow"><i class="fas fa-right-left"></i></span>
+            <span class="quick-action-label">Borrowing</span>
+        </a>
+        {% if has_perm('ebooks.view_own') or has_perm('ebooks.manage') %}
+        <a href="{{ url_for('ebooks.index') }}" class="quick-action-tile">
+            <span class="quick-action-icon ebook"><i class="fas fa-tablet-screen-button"></i></span>
+            <span class="quick-action-label">E-Books</span>
+        </a>
+        {% endif %}
+        {% if has_perm('reservations.manage_own') or has_perm('reservations.manage') %}
+        <a href="{{ url_for('reservations.index') }}" class="quick-action-tile">
+            <span class="quick-action-icon reserve"><i class="fas fa-bookmark"></i></span>
+            <span class="quick-action-label">Reservations</span>
+        </a>
+        {% endif %}
+        {% if has_perm('inventory.view') %}
+        <a href="{{ url_for('inventory.index') }}" class="quick-action-tile">
+            <span class="quick-action-icon inventory"><i class="fas fa-boxes-stacked"></i></span>
+            <span class="quick-action-label">Inventory</span>
+        </a>
+        {% endif %}
+        {% if has_perm('fines.view_own') or has_perm('fines.manage') %}
+        <a href="{{ url_for('fines.index') }}" class="quick-action-tile">
+            <span class="quick-action-icon fines"><i class="fas fa-clock"></i></span>
+            <span class="quick-action-label">Fines</span>
+        </a>
+        {% endif %}
+        {% if has_perm('reports.view') %}
+        <a href="{{ url_for('analytics.index') }}" class="quick-action-tile">
+            <span class="quick-action-icon reports"><i class="fas fa-chart-line"></i></span>
+            <span class="quick-action-label">Reports</span>
+        </a>
+        {% endif %}
+        {% if has_perm('clearance.request') or has_perm('clearance.manage') %}
+        <a href="{{ url_for('clearance.index') }}" class="quick-action-tile">
+            <span class="quick-action-icon clearance"><i class="fas fa-clipboard-check"></i></span>
+            <span class="quick-action-label">Clearance</span>
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="dashboard-grid grid-2 mb-6">
+    <div class="info-card info-card-patron">
+        <div class="info-card-top">
+            {{ user_avatar(current_user, 'sm', 'info-card-avatar-wrap') }}
+            <div class="info-card-heading">
+                <p class="info-card-label">{% if current_user.role == 'patron' %}My Account{% elif current_user.role == 'admin' %}Administrator{% else %}Staff Account{% endif %}</p>
+                <p class="info-card-subtitle">{{ role_label }} · {{ current_user.email }}</p>
+            </div>
+            <div class="info-card-icon"><i class="fas fa-user"></i></div>
+        </div>
+        <div class="info-list">
+            <div class="info-list-item">
+                <span class="info-list-label">Name</span>
+                <span class="info-list-value">{{ current_user.full_name }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Username</span>
+                <span class="info-list-value mono">{{ current_user.username }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Library ID</span>
+                <span class="info-list-value mono">{{ current_user.library_id }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Card Status</span>
+                <span class="status-badge status-card-{{ extras.card_info.level }}">
+                    <i class="fas fa-circle"></i> {{ extras.card_info.label }}
+                </span>
+            </div>
+            {% if current_user.role == 'patron' and extras.fine_stats %}
+            <div class="info-list-item">
+                <span class="info-list-label">On-Time Returns</span>
+                <span class="info-list-value">{{ extras.fine_stats.on_time_returns }}</span>
+            </div>
+            {% elif current_user.role in ['staff', 'admin'] %}
+            <div class="info-list-item">
+                <span class="info-list-label">Your Actions Today</span>
+                <span class="info-list-value highlight">{{ stats.staff_actions_today|default(0) }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="info-card info-card-summary">
+        <div class="info-card-top">
+            <div class="info-card-heading">
+                <p class="info-card-label">{% if current_user.role == 'patron' %}My Library Activity{% else %}Library Operations{% endif %}</p>
+                <p class="info-card-subtitle">{% if stats.scope == 'personal' %}Personalized for your account{% else %}System-wide snapshot{% endif %}</p>
+            </div>
+            <div class="info-card-icon"><i class="fas fa-book-open"></i></div>
+        </div>
+        <div class="info-list">
+            {% if current_user.role == 'patron' %}
+            <div class="info-list-item">
+                <span class="info-list-label">Active Loans</span>
+                <span class="info-list-value highlight">{{ stats.my_active_loans }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Reservations</span>
+                <span class="info-list-value">{{ stats.my_reservations }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Unpaid Fines</span>
+                <span class="info-list-value {% if stats.my_unpaid_fines > 0 %}warn{% endif %}">₱{{ '%.2f'|format(stats.my_unpaid_fines) }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Total Borrowed (All Time)</span>
+                <span class="info-list-value">{{ stats.my_total_borrows }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Active E-Books</span>
+                <span class="info-list-value">{{ stats.my_ebooks }}</span>
+            </div>
+            {% else %}
+            <div class="info-list-item">
+                <span class="info-list-label">Total Books</span>
+                <span class="info-list-value highlight">{{ stats.total_books }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Active Loans</span>
+                <span class="info-list-value">{{ stats.active_loans }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Pending Holds</span>
+                <span class="info-list-value">{{ stats.pending_reservations }}</span>
+            </div>
+            <div class="info-list-item">
+                <span class="info-list-label">Unpaid Fines (All)</span>
+                <span class="info-list-value {% if stats.unpaid_fines_total > 0 %}warn{% endif %}">₱{{ '%.2f'|format(stats.unpaid_fines_total) }}</span>
+            </div>
+            {% endif %}
+            <div class="info-list-item">
+                <span class="info-list-label">Available</span>
+                <span class="info-list-value success">{{ stats.available_copies }} copies</span>
+            </div>
+        </div>
+        <div class="info-card-footer">
+            <div class="availability-bar">
+                <div class="availability-bar-fill" style="width: {{ ((stats.available_copies / stats.total_copies * 100) if stats.total_copies else 0)|int }}%;"></div>
+            </div>
+            <span class="availability-bar-label">{% if current_user.role == 'patron' %}Campus collection availability{% else %}Collection availability{% endif %}</span>
+        </div>
+    </div>
+</div>
+
+<div class="reminder-box">
+    <div class="reminder-icon"><i class="fas fa-bell"></i></div>
+    <div class="reminder-content">
+        <p class="reminder-title">{% if current_user.role == 'patron' %}Your Status{% else %}Operations Note{% endif %}</p>
+        <p class="reminder-text">{{ extras.reminder_text }}</p>
+    </div>
+</div>
+
+{% if chart_data.scope == 'system' %}
+<div class="section-header mb-6">
+    <div>
+        <h2 class="section-title">Module Analytics</h2>
+        <p class="section-subtitle">Visual overview across all library modules</p>
+    </div>
+    <a href="{{ url_for('analytics.index') }}" class="btn-secondary">
+        <i class="fas fa-chart-line"></i> Full Reports
+    </a>
+</div>
+<div class="chart-grid chart-grid-dashboard mb-6">
+    <div class="chart-card chart-card-sm">
+        <div class="chart-card-header"><i class="fas fa-right-left"></i> Borrowing</div>
+        <div class="chart-canvas-wrap chart-canvas-sm"><canvas id="dash-chart-borrowing"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-sm">
+        <div class="chart-card-header"><i class="fas fa-bookmark"></i> Reservations</div>
+        <div class="chart-canvas-wrap chart-canvas-sm"><canvas id="dash-chart-reservations"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-sm">
+        <div class="chart-card-header"><i class="fas fa-clock"></i> Fines</div>
+        <div class="chart-canvas-wrap chart-canvas-sm"><canvas id="dash-chart-fines"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-sm">
+        <div class="chart-card-header"><i class="fas fa-boxes-stacked"></i> Inventory</div>
+        <div class="chart-canvas-wrap chart-canvas-sm"><canvas id="dash-chart-inventory"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-sm">
+        <div class="chart-card-header"><i class="fas fa-tablet-screen-button"></i> E-Books</div>
+        <div class="chart-canvas-wrap chart-canvas-sm"><canvas id="dash-chart-ebooks"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-sm">
+        <div class="chart-card-header"><i class="fas fa-clipboard-check"></i> Clearance</div>
+        <div class="chart-canvas-wrap chart-canvas-sm"><canvas id="dash-chart-clearance"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-sm">
+        <div class="chart-card-header"><i class="fas fa-triangle-exclamation"></i> Lost / Damaged</div>
+        <div class="chart-canvas-wrap chart-canvas-sm"><canvas id="dash-chart-lost-damaged"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-sm">
+        <div class="chart-card-header"><i class="fas fa-tags"></i> Genres</div>
+        <div class="chart-canvas-wrap chart-canvas-sm"><canvas id="dash-chart-genres"></canvas></div>
+    </div>
+</div>
+{% else %}
+<div class="section-header mb-6">
+    <div>
+        <h2 class="section-title">Your Library Activity</h2>
+        <p class="section-subtitle">Personal overview of your borrowing, reservations, and fines</p>
+    </div>
+</div>
+<div class="chart-grid chart-grid-personal mb-6">
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-right-left"></i> My Borrowing</div>
+        <div class="chart-canvas-wrap"><canvas id="personal-chart-borrowing"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-bookmark"></i> My Reservations</div>
+        <div class="chart-canvas-wrap"><canvas id="personal-chart-reservations"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-card-header"><i class="fas fa-clock"></i> My Fines</div>
+        <div class="chart-canvas-wrap"><canvas id="personal-chart-fines"></canvas></div>
+    </div>
+</div>
+{% endif %}
+
+<div class="dashboard-grid grid-2">
+    <div class="page-card dashboard-table-card">
+        <div class="page-card-header">
+            <span class="page-card-header-icon indigo"><i class="fas fa-chart-bar"></i></span>
+            <span>{% if current_user.role == 'patron' %}My Most Borrowed{% else %}Most Borrowed (Library-wide){% endif %}</span>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table data-table-compact">
+                <thead><tr><th>Title</th><th class="text-right">Borrows</th></tr></thead>
+                <tbody>
+                    {% for item in stats.most_borrowed %}
+                    <tr>
+                        <td>
+                            <div class="table-title-cell">
+                                <span class="rank-badge">{{ loop.index }}</span>
+                                <span>{{ item.title }}</span>
+                            </div>
+                        </td>
+                        <td class="text-right"><span class="count-pill">{{ item.borrow_count }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2" class="empty-cell compact">
+                        <i class="fas fa-chart-simple empty-icon"></i>
+                        <p>No data yet</p>
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="page-card dashboard-table-card">
+        <div class="page-card-header">
+            <span class="page-card-header-icon amber"><i class="fas fa-clock-rotate-left"></i></span>
+            <span>{% if current_user.role == 'patron' %}My Recent Activity{% else %}Your Recent Actions{% endif %}</span>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table data-table-compact">
+                <thead><tr><th>Event</th><th>Time</th></tr></thead>
+                <tbody>
+                    {% for act in stats.recent_activity %}
+                    <tr>
+                        <td>
+                            <div class="activity-cell">
+                                <span class="activity-dot"></span>
+                                <span class="activity-event">{{ act.event_type|replace('_', ' ')|capitalize }}</span>
+                            </div>
+                        </td>
+                        <td class="text-muted activity-time">{{ act.created_at.strftime('%b %d, %Y %I:%M %p') if act.created_at else '' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2" class="empty-cell compact">
+                        <i class="fas fa-clock empty-icon"></i>
+                        <p>No activity yet</p>
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+{% if current_user.role in ['staff', 'admin'] %}
+<div id="spotlight-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-star"></i> Set Book of the Week</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('dashboard.set_spotlight') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Book ID</label>
+                    <input type="number" name="book_id" class="form-control" required placeholder="e.g. 2">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Label</label>
+                    <input type="text" name="label" class="form-control" value="Staff Pick">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Note (optional)</label>
+                    <textarea name="note" rows="2" class="form-control" placeholder="Why we're recommending this book…"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square">Save Spotlight</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+document.querySelectorAll('[data-count]').forEach(el => {
+    const target = parseFloat(el.dataset.count);
+    if (isNaN(target)) return;
+    if (target === 0) return;
+    if (el.textContent.trim().startsWith('₱')) return;
+    let current = 0;
+    const step = Math.max(1, Math.ceil(target / 20));
+    const timer = setInterval(() => {
+        current = Math.min(current + step, target);
+        el.textContent = current;
+        if (current >= target) clearInterval(timer);
+    }, 30);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const heroTitle = document.getElementById('welcome-hero-title');
+    if (heroTitle) {
+        const hour = new Date().getHours();
+        const name = {{ current_user.full_name.split()[0]|tojson }};
+        let greeting = 'Good evening';
+        if (hour < 12) greeting = 'Good morning';
+        else if (hour < 17) greeting = 'Good afternoon';
+        heroTitle.textContent = `${greeting}, ${name}!`;
+    }
+
+    const scope = {{ chart_data.scope|tojson }};
+    const modules = {{ chart_data.modules|tojson }};
+    window.LMS_DASHBOARD_TOASTS = true;
+    window.LMS_TIPS = {{ extras.library_tips|tojson }};
+    window.LMS_TRIVIA = {{ extras.trivia_pool|tojson }};
+    if (scope === 'system') {
+        initModuleCharts(modules, 'dash');
+    } else {
+        initPersonalCharts(modules);
+    }
+});
+</script>
+{% endblock %}

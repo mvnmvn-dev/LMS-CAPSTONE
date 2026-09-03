@@ -1,0 +1,136 @@
+{% from 'macros/ui.html' import csrf_field, form_input, form_select %}
+
+{# Create User Modal #}
+<div id="create-user-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-user-plus"></i> Create User</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('users.create') }}">
+            {{ csrf_field() }}
+            <div class="modal-body">
+                {{ form_input('full_name', 'Full Name', required=true) }}
+                {{ form_input('email', 'Email', type='email', required=true) }}
+                {{ form_input('username', 'Username', required=true) }}
+                {{ form_input('library_id', 'Library ID (optional — auto-generated if blank)') }}
+                {{ form_input('barcode', 'Barcode (optional)') }}
+                {{ form_select('role', 'Role', [
+                    ('patron', 'Student (Patron)'),
+                    ('staff', 'Librarian Staff'),
+                    ('admin', 'Administrator'),
+                ], 'patron') }}
+                {{ form_select('card_status', 'Card Status', [
+                    ('active', 'Active'),
+                    ('expired', 'Expired'),
+                    ('suspended', 'Suspended'),
+                    ('inactive', 'Inactive'),
+                ], 'active') }}
+                <div class="reminder-box">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="confirm_create" value="1" required>
+                        I confirm creating this account with the selected role.
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square"><i class="fas fa-user-plus"></i> Create User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# Edit User Modals (one per row) #}
+{% for user in users %}
+<div id="edit-user-modal-{{ user.id }}" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-user-pen"></i> Edit User — {{ user.full_name }}</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('users.edit', user_id=user.id) }}">
+            {{ csrf_field() }}
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="full_name-{{ user.id }}">Full Name</label>
+                    <input type="text" id="full_name-{{ user.id }}" name="full_name" value="{{ user.full_name }}" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="email-{{ user.id }}">Email</label>
+                    <input type="email" id="email-{{ user.id }}" name="email" value="{{ user.email }}" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="role-{{ user.id }}">Role</label>
+                    <select id="role-{{ user.id }}" name="role" class="form-control" data-original-role="{{ user.role }}">
+                        <option value="patron" {% if user.role == 'patron' %}selected{% endif %}>Student (Patron)</option>
+                        <option value="staff" {% if user.role == 'staff' %}selected{% endif %}>Librarian Staff</option>
+                        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Administrator</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="card_status-{{ user.id }}">Card Status</label>
+                    <select id="card_status-{{ user.id }}" name="card_status" class="form-control">
+                        <option value="active" {% if user.card_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="expired" {% if user.card_status == 'expired' %}selected{% endif %}>Expired</option>
+                        <option value="suspended" {% if user.card_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                        <option value="inactive" {% if user.card_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="account_status-{{ user.id }}">Account Status</label>
+                    <select id="account_status-{{ user.id }}" name="account_status" class="form-control">
+                        <option value="active" {% if user.account_status == 'active' %}selected{% endif %}>Active — can log in</option>
+                        <option value="disabled" {% if user.account_status == 'disabled' %}selected{% endif %}>Disabled — login blocked</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="card_expiry-{{ user.id }}">Card Expiry</label>
+                    <input type="date" id="card_expiry-{{ user.id }}" name="card_expiry" class="form-control"
+                        value="{{ user.card_expiry.strftime('%Y-%m-%d') if user.card_expiry else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="reason-{{ user.id }}">Reason for changes <span class="text-danger">*</span></label>
+                    <textarea id="reason-{{ user.id }}" name="reason" rows="2" class="form-control" placeholder="Required when changing role or account status"></textarea>
+                </div>
+                {% if user.role != 'admin' or user.id != current_user.id %}
+                <div id="role-confirm-{{ user.id }}" class="reminder-box" style="display:none;">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="confirm_role_change" value="1">
+                        I confirm changing this user's role (role escalation requires explicit confirmation).
+                    </label>
+                </div>
+                {% endif %}
+                {% if user.must_change_password %}
+                <p class="text-muted" style="font-size:0.875rem;"><i class="fas fa-exclamation-triangle"></i> User must change password on next login.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square"><i class="fas fa-save"></i> Save Changes</button>
+            </div>
+        </form>
+        <div class="modal-body" style="border-top:1px solid var(--border-color, #e5e7eb);padding-top:1rem;">
+            <div class="flex gap-2 flex-wrap">
+                <form method="POST" action="{{ url_for('users.reset_password_route', user_id=user.id) }}" onsubmit="return confirm('Reset password for {{ user.full_name }}?');">
+                    {{ csrf_field() }}
+                    <button type="submit" class="btn-secondary"><i class="fas fa-key"></i> Reset Password</button>
+                </form>
+                {% if user.id != current_user.id %}
+                <form method="POST" action="{{ url_for('users.toggle_status', user_id=user.id) }}">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="reason" id="toggle-reason-{{ user.id }}">
+                    <button type="button" class="btn-secondary"
+                        onclick="var r=prompt('Reason for {% if user.account_status == 'disabled' %}reactivating{% else %}disabling{% endif %} this account:'); if(r){document.getElementById('toggle-reason-{{ user.id }}').value=r;this.form.submit();}">
+                        <i class="fas fa-{% if user.account_status == 'disabled' %}user-check{% else %}user-slash{% endif %}"></i>
+                        {% if user.account_status == 'disabled' %}Reactivate Account{% else %}Disable Account{% endif %}
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}

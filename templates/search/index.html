@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% from 'macros/book.html' import book_cover %}
+{% from 'macros/pagination.html' import render_pagination %}
+
+{% block page_actions %}
+<button class="btn-primary-square" data-open-modal="search-modal"><i class="fas fa-sliders"></i> Advanced</button>
+<a href="{{ url_for('search.index') }}" class="btn-secondary" id="search-clear-all-btn" data-search-ajax-link {% if not (query or genre or available_only or ebook_only) %}hidden{% endif %}>
+    <i class="fas fa-times"></i> Clear all
+</a>
+<span class="results-count" id="search-results-count"><i class="fas fa-book"></i> {{ pagination.total }} result{{ 's' if pagination.total != 1 else '' }}</span>
+{% endblock %}
+
+{% block content %}
+
+{% if recently_viewed or trending %}
+<div class="search-discovery mb-6">
+    {% if recently_viewed %}
+    <div class="discovery-section">
+        <h3 class="discovery-title"><i class="fas fa-clock-rotate-left"></i> Recently Viewed</h3>
+        <div class="discovery-scroll">
+            {% for book in recently_viewed %}
+            <button type="button" class="discovery-card" data-book-detail="{{ book.id }}">
+                {{ book_cover(book, 'sm') }}
+                <span class="discovery-card-title">{{ book.title }}</span>
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% if trending %}
+    <div class="discovery-section">
+        <h3 class="discovery-title"><i class="fas fa-fire"></i> Trending / Most Borrowed</h3>
+        <div class="discovery-scroll">
+            {% for book in trending %}
+            <button type="button" class="discovery-card" data-book-detail="{{ book.id }}">
+                {{ book_cover(book, 'sm') }}
+                <span class="discovery-card-title">{{ book.title }}</span>
+                <span class="discovery-card-meta">{{ book.borrow_count }} borrows</span>
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="search-filter-shell mb-6" id="search-filter-shell">
+    <div class="search-filter-toolbar">
+        <button type="button" class="search-filter-toggle" id="search-filter-toggle" aria-expanded="false" aria-controls="search-filter-root">
+            <span class="search-filter-toggle-icon"><i class="fas fa-sliders"></i></span>
+            <span class="search-filter-toggle-text">Browse &amp; Filter</span>
+            <span class="search-filter-toggle-meta" id="search-filter-toggle-meta">Show</span>
+            <i class="fas fa-chevron-down search-filter-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="search-filter-toolbar-tags" id="search-filter-toolbar-tags" hidden></div>
+    </div>
+    <div id="search-filter-root" class="search-filter-root is-collapsed">
+        {% include 'search/_filters.html' %}
+    </div>
+</div>
+
+<div id="search-results-root">
+    {% include 'search/_results.html' %}
+</div>
+
+{% endblock %}
+
+
+
+{% block modals %}
+
+<div id="search-modal" class="modal">
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-dialog">
+
+        <div class="modal-header">
+
+            <h3 class="modal-title"><i class="fas fa-sliders"></i> Search &amp; Filter</h3>
+
+            <button type="button" class="modal-close" data-close-modal aria-label="Close">&times;</button>
+
+        </div>
+
+        <form method="GET" action="{{ url_for('search.index') }}" data-search-ajax-form>
+
+            <div class="modal-body">
+
+                <div class="form-group">
+
+                    <label class="form-label">Search</label>
+
+                    <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Title, author, ISBN...">
+
+                </div>
+
+                <div class="form-group">
+
+                    <label class="form-label">Genre</label>
+
+                    <select name="genre" class="form-control">
+
+                        <option value="">All Genres</option>
+
+                        {% for g in genres %}
+
+                        <option value="{{ g }}" {% if genre == g %}selected{% endif %}>{{ g }}</option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <label class="form-check">
+
+                    <input type="checkbox" name="available" value="1" {% if available_only %}checked{% endif %}> Available only
+
+                </label>
+
+                <label class="form-check">
+
+                    <input type="checkbox" name="ebook" value="1" {% if ebook_only %}checked{% endif %}> Has E-Book
+
+                </label>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+
+                <button type="submit" class="btn-primary-square"><i class="fas fa-search"></i> Search</button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+
+<div id="book-detail-modal" class="modal">
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-dialog modal-lg">
+
+        <div class="modal-header">
+
+            <h3 class="modal-title" id="book-detail-title">Book Details</h3>
+
+            <button type="button" class="modal-close" data-close-modal aria-label="Close">&times;</button>
+
+        </div>
+
+        <div class="modal-body" id="book-detail-body">
+
+            <div class="book-detail-loading">
+
+                <div class="spinner"></div>
+
+                <p>Loading book details…</p>
+
+            </div>
+
+        </div>
+
+        <div class="modal-footer" id="book-detail-footer" style="display:none;"></div>
+
+    </div>
+
+</div>
+
+
+
+<div id="search-reserve-modals">
+{% include 'search/_reserve_modals.html' %}
+</div>
+
+{% endblock %}
+
+
+
+{% block scripts %}
+
+<script src="{{ url_for('static', filename='js/search-page.js') }}"></script>
+<script>
+
+    window.LMS_URLS = {
+
+        ebooks: "{{ url_for('ebooks.index') }}",
+
+        reserve: "{{ url_for('search.reserve', book_id=0) }}".replace('/0/reserve', ''),
+
+        searchResults: "{{ url_for('search.results_fragment') }}",
+
+        searchIndex: "{{ url_for('search.index') }}"
+
+    };
+
+    {% if request.args.get('book') %}
+
+    window.LMS_AUTO_OPEN_BOOK = {{ request.args.get('book')|int }};
+
+    {% endif %}
+
+</script>
+
+{% endblock %}
+

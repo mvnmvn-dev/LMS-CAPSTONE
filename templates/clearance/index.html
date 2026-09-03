@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% from 'macros/pagination.html' import render_pagination %}
+
+{% block page_actions %}
+{% if current_user.role == 'patron' %}
+<button class="btn-primary-square" data-open-modal="clearance-modal"><i class="fas fa-clipboard-check"></i> Request Clearance Audit</button>
+{% if audit and audit.cleared %}
+<button type="button" class="btn-secondary" onclick="window.print()"><i class="fas fa-print"></i> Print Slip</button>
+{% endif %}
+{% else %}
+<form method="GET" action="{{ url_for('clearance.index') }}" class="scan-lookup-form">
+    <input type="text" name="code" value="{{ lookup_code }}" class="form-control scan-input" placeholder="Patron Library ID or barcode…">
+    <button type="submit" class="btn-primary-square"><i class="fas fa-search"></i> Check Patron</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{# ── PATRON VIEW ── #}
+{% if current_user.role == 'patron' %}
+
+<div class="info-card mb-6">
+    <div class="info-card-top">
+        <div class="info-card-heading">
+            <p class="info-card-label">How it works</p>
+            <p class="info-card-subtitle">Request a clearance audit before graduation or enrollment. The system checks your loans, holds, and fines.</p>
+        </div>
+        <div class="info-card-icon"><i class="fas fa-circle-info"></i></div>
+    </div>
+</div>
+
+{% if audit %}
+<div class="clearance-checklist mb-6" id="clearance-slip">
+    <h2 class="section-title" style="font-size:1.1rem;margin-bottom:1rem;">Your Clearance Status</h2>
+    {% for item in checklist %}
+    <div class="checklist-item {% if item.ok %}checklist-ok{% else %}checklist-blocked{% endif %}">
+        <span class="checklist-icon">
+            <i class="fas fa-{% if item.ok %}circle-check{% else %}circle-xmark{% endif %}"></i>
+        </span>
+        <div class="checklist-body">
+            <strong>{{ item.label }}</strong>
+            <span class="checklist-detail">{{ item.detail }}</span>
+        </div>
+        {% if not item.ok and item.link %}
+        <a href="{{ item.link }}" class="btn-action accent">{{ item.action }}</a>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div class="reminder-box {% if audit.cleared %}clearance-cleared{% endif %}">
+    {% if audit.cleared %}
+    <div class="reminder-icon" style="background:#dcfce7;color:#16a34a;"><i class="fas fa-graduation-cap"></i></div>
+    <div class="reminder-content">
+        <p class="reminder-title" style="color:#16a34a;">Cleared for Graduation / Exit</p>
+        <p class="reminder-text">You have no outstanding library obligations. Click <strong>Request Clearance Audit</strong> to record your clearance, then print your slip.</p>
+        <p class="print-only-slip">
+            <strong>{{ current_user.full_name }}</strong> · {{ current_user.library_id }}<br>
+            Cleared on {{ now.strftime('%B %d, %Y') }} · Bestlink College Library
+        </p>
+    </div>
+    {% else %}
+    <div class="reminder-icon"><i class="fas fa-ban"></i></div>
+    <div class="reminder-content">
+        <p class="reminder-title">Not Yet Cleared</p>
+        <p class="reminder-text">Resolve the items marked above, then click <strong>Request Clearance Audit</strong> to submit your clearance request.</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{# ── STAFF / ADMIN VIEW ── #}
+{% else %}
+
+<div class="info-card mb-6">
+    <div class="info-card-top">
+        <div class="info-card-heading">
+            <p class="info-card-label">Staff Clearance Desk</p>
+            <p class="info-card-subtitle">Look up a patron by Library ID or barcode to check their clearance status. Patrons submit requests from their own account — those appear in the log below.</p>
+        </div>
+        <div class="info-card-icon"><i class="fas fa-clipboard-check"></i></div>
+    </div>
+</div>
+
+{% if stats %}
+<div class="grid-4 mb-6">
+    <div class="stat-card stat-indigo">
+        <div class="stat-card-inner">
+            <div class="stat-body">
+                <p class="stat-label">Total Requests</p>
+                <p class="stat-value indigo">{{ stats.total }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="stat-card stat-emerald">
+        <div class="stat-card-inner">
+            <div class="stat-body">
+                <p class="stat-label">Cleared</p>
+                <p class="stat-value emerald">{{ stats.cleared }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="stat-card stat-red">
+        <div class="stat-card-inner">
+            <div class="stat-body">
+                <p class="stat-label">Blocked</p>
+                <p class="stat-value red">{{ stats.blocked }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if patron_lookup and patron_audit %}
+<div class="page-card mb-6">
+    <div class="page-card-header">
+        <i class="fas fa-user"></i> Patron Audit — {{ patron_lookup.full_name }} ({{ patron_lookup.library_id }})
+    </div>
+    <div style="padding: 1.25rem;">
+        <div class="clearance-checklist">
+            {% for item in patron_checklist %}
+            <div class="checklist-item {% if item.ok %}checklist-ok{% else %}checklist-blocked{% endif %}">
+                <span class="checklist-icon">
+                    <i class="fas fa-{% if item.ok %}circle-check{% else %}circle-xmark{% endif %}"></i>
+                </span>
+                <div class="checklist-body">
+                    <strong>{{ item.label }}</strong>
+                    <span class="checklist-detail">{{ item.detail }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="reminder-box mt-4 {% if patron_audit.cleared %}clearance-cleared{% endif %}" style="margin-bottom:0;">
+            {% if patron_audit.cleared %}
+            <div class="reminder-icon" style="background:#dcfce7;color:#16a34a;"><i class="fas fa-check"></i></div>
+            <div class="reminder-content">
+                <p class="reminder-title" style="color:#16a34a;">Patron is Cleared</p>
+                <p class="reminder-text">No outstanding loans, holds, or fines.</p>
+            </div>
+            {% else %}
+            <div class="reminder-icon"><i class="fas fa-ban"></i></div>
+            <div class="reminder-content">
+                <p class="reminder-title">Patron is Blocked</p>
+                <p class="reminder-text">{{ patron_audit.blocked_reason or 'Outstanding obligations found.' }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="page-card overflow-hidden">
+    <div class="page-card-header"><i class="fas fa-list"></i> Clearance Request Log</div>
+    {% if requests %}
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>Patron</th><th>Library ID</th><th>Status</th><th>Requested</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+                {% for req in requests %}
+                <tr>
+                    <td><strong>{{ req.full_name }}</strong></td>
+                    <td>{{ req.library_id }}</td>
+                    <td><span class="status-badge {% if req.status == 'cleared' %}available{% else %}unavailable{% endif %}">{{ req.status }}</span></td>
+                    <td>{{ req.requested_at.strftime('%b %d, %Y %I:%M %p') if req.requested_at else '—' }}</td>
+                    <td>{{ req.notes or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ render_pagination(pagination) }}
+    </div>
+    {% else %}
+    <div class="empty-cell">
+        <i class="fas fa-inbox empty-icon"></i>
+        <p>No clearance requests yet</p>
+        <p class="text-muted" style="font-size:0.8125rem;max-width:28rem;margin:0.5rem auto 0;">Patrons submit requests from their account using <strong>Request Clearance Audit</strong>. Use the search above to manually check any patron's status.</p>
+        <p class="text-muted" style="font-size:0.75rem;margin-top:0.75rem;">Try looking up demo patron: <code>LIB-PAT-001</code></p>
+    </div>
+    {% endif %}
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block modals %}
+{% if current_user.role == 'patron' %}
+<div id="clearance-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Request Clearance Audit</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('clearance.request_clearance_route') }}">
+            <div class="modal-body">
+                <p>This will check your active loans, pending holds, and unpaid fines, then record the result.</p>
+                {% if audit and not audit.cleared %}
+                <p class="text-muted" style="font-size:0.8125rem;margin-top:0.5rem;">Note: you currently have outstanding items. The request will be recorded as <strong>blocked</strong>.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square">Run Audit</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

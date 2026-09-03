@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% from 'macros/pagination.html' import render_pagination %}
+{% if copies %}
+{% block page_actions %}
+<button class="btn-danger" data-open-modal="report-modal"><i class="fas fa-triangle-exclamation"></i> Submit Report</button>
+{% endblock %}
+{% endif %}
+{% block content %}
+<div class="page-card overflow-hidden">
+    <div class="page-card-header"><i class="fas fa-clipboard-list"></i> Reports</div>
+    <table class="data-table">
+        <thead>
+            <tr><th>Book</th><th>Barcode</th><th>Type</th><th>Progress</th><th>Cost</th><th>Reporter</th><th>Date</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            {% for r in reports %}
+            <tr>
+                <td><strong>{{ r.title }}</strong></td>
+                <td>{{ r.barcode }}</td>
+                <td>{{ r.report_type }}</td>
+                <td>
+                    <div class="status-stepper">
+                        <span class="step {% if r.status == 'open' %}active{% elif r.status in ['under_review','resolved'] %}done{% endif %}">Reported</span>
+                        <span class="step {% if r.status == 'under_review' %}active{% elif r.status == 'resolved' %}done{% endif %}">Review</span>
+                        <span class="step {% if r.status == 'resolved' %}active done{% endif %}">Resolved</span>
+                    </div>
+                </td>
+                <td>₱{{ '%.2f'|format(r.replacement_cost or 0) }}</td>
+                <td>{{ r.reporter_name }}</td>
+                <td>{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '—' }}</td>
+                <td>
+                    {% if r.status != 'resolved' and current_user.role in ['staff', 'admin'] %}
+                    <button class="btn-action primary" data-open-modal="resolve-modal-{{ r.id }}">Resolve</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="empty-cell">
+                <i class="fas fa-shield-check empty-icon"></i>
+                <p>No reports — everything looks good!</p>
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {{ render_pagination(pagination) }}
+</div>
+{% endblock %}
+
+{% block modals %}
+{% if copies %}
+<div id="report-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+            <h3 class="modal-title">Submit Lost/Damaged Report</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('lost_damaged.report') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Copy *</label>
+                    <select name="copy_id" required class="form-control">
+                        <option value="">Select copy...</option>
+                        {% for c in copies %}
+                        <option value="{{ c.id }}">{{ c.title }} ({{ c.barcode }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Report Type</label>
+                    <select name="report_type" class="form-control">
+                        <option value="lost">Lost</option>
+                        <option value="damaged">Damaged</option>
+                    </select>
+                </div>
+                {% if current_user.role in ['staff', 'admin'] %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Responsible User ID</label>
+                        <input type="number" name="user_id" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Replacement Cost</label>
+                        <input type="number" name="replacement_cost" step="0.01" class="form-control" placeholder="0.00">
+                    </div>
+                </div>
+                {% endif %}
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <textarea name="notes" rows="2" class="form-control" placeholder="Additional details..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-danger">Submit Report</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% for r in reports %}
+{% if r.status != 'resolved' and current_user.role in ['staff', 'admin'] %}
+<div id="resolve-modal-{{ r.id }}" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Resolve Report</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('lost_damaged.resolve', report_id=r.id) }}">
+            <div class="modal-body">
+                <p>Mark report for <strong>{{ r.title }}</strong> ({{ r.barcode }}) as resolved?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-success">Resolve</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}

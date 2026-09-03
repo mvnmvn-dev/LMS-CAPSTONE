@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="POST" class="bg-white rounded-lg shadow-sm border p-6 max-w-2xl">
+    <div class="grid grid-cols-1 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <input type="text" name="title" value="{{ book.title if book else '' }}" required class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">ISBN</label>
+                <input type="text" name="isbn" value="{{ book.isbn if book else '' }}" class="w-full border rounded-lg px-3 py-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Genre</label>
+                <input type="text" name="genre" value="{{ book.genre if book else '' }}" class="w-full border rounded-lg px-3 py-2">
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Publisher</label>
+            <input type="text" name="publisher" value="{{ book.publisher if book else '' }}" class="w-full border rounded-lg px-3 py-2">
+        </div>
+        {% if not book %}
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Authors (comma-separated)</label>
+            <input type="text" name="authors" class="w-full border rounded-lg px-3 py-2" placeholder="Author One, Author Two">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Copy Barcodes (comma-separated)</label>
+            <input type="text" name="barcodes" class="w-full border rounded-lg px-3 py-2" placeholder="CPY-001, CPY-002">
+        </div>
+        {% endif %}
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea name="description" rows="3" class="w-full border rounded-lg px-3 py-2">{{ book.description if book else '' }}</textarea>
+        </div>
+        <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="has_ebook" {% if book and book.has_ebook %}checked{% endif %}>
+            Has E-Book format
+        </label>
+    </div>
+    <div class="mt-6 flex gap-3">
+        <button type="submit" class="px-6 py-2 btn-primary-square rounded-lg">Save</button>
+        <a href="{{ url_for('inventory.index') }}" class="px-6 py-2 border rounded-lg">Cancel</a>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% from 'macros/pagination.html' import render_pagination %}
+{% block content %}
+<div class="page-card activity-filter-card">
+    <div class="page-card-header"><i class="fas fa-filter"></i> Filter Events</div>
+    <div class="activity-filter-body">
+        <form method="GET" action="{{ url_for('activity.index') }}" class="activity-filter-form">
+            <div class="form-group">
+                <label class="form-label" for="activity-event-type">Event Type</label>
+                <select id="activity-event-type" name="event_type" class="form-control">
+                    <option value="">All events</option>
+                    {% for et in event_types %}
+                    <option value="{{ et }}" {% if selected_event == et %}selected{% endif %}>{{ et|replace('_', ' ')|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="activity-actor">Actor</label>
+                <input id="activity-actor" type="search" name="actor" class="form-control" value="{{ selected_actor }}" placeholder="Name or username">
+            </div>
+            <div class="activity-filter-actions">
+                <button type="submit" class="btn-primary-square"><i class="fas fa-filter"></i> Apply</button>
+                {% if selected_event or selected_actor %}
+                <a href="{{ url_for('activity.index') }}" class="btn-secondary"><i class="fas fa-xmark"></i> Clear</a>
+                {% endif %}
+            </div>
+        </form>
+        {% if selected_event or selected_actor %}
+        <p class="activity-filter-summary">
+            {% if pagination.total %}
+            {{ pagination.total }} matching event{{ 's' if pagination.total != 1 else '' }}
+            {% else %}
+            No matching events
+            {% endif %}
+            {% if selected_event %}for <strong>{{ selected_event|replace('_', ' ')|title }}</strong>{% endif %}
+            {% if selected_actor %}from actors matching <strong>{{ selected_actor }}</strong>{% endif %}
+        </p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="page-card overflow-hidden mt-4">
+    <div class="page-card-header"><i class="fas fa-shield-halved"></i> Security &amp; Audit Events</div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Actor</th>
+                    <th>Entity</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.created_at.strftime('%b %d, %Y %I:%M %p') if log.created_at else '—' }}</td>
+                    <td><code class="activity-event-code">{{ log.event_type }}</code></td>
+                    <td>
+                        {{ log.actor_name or '—' }}
+                        {% if log.actor_username %}
+                        <br><span class="text-muted activity-actor-username">{{ log.actor_username }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.entity_type %}
+                        {{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="activity-details-cell">
+                        {% if log.metadata is mapping and log.metadata %}
+                        <div class="activity-meta-list">
+                            {% for key, value in log.metadata.items() %}
+                            <span class="activity-meta-chip"><span class="activity-meta-key">{{ key }}</span> {{ value }}</span>
+                            {% endfor %}
+                        </div>
+                        {% elif log.metadata %}
+                        <span class="text-muted">{{ log.metadata }}</span>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="empty-cell">
+                        {% if selected_event or selected_actor %}
+                        No events match your filters.
+                        {% else %}
+                        No activity logged yet.
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {{ render_pagination(pagination) }}
+    </div>
+</div>
+{% endblock %}

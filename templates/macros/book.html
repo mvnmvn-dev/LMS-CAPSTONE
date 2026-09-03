@@ -1,0 +1,22 @@
+{% macro book_cover(book, size='sm') %}
+{% set isbn = book.isbn if book is mapping else book.get('isbn') %}
+{% set title = book.title if book is mapping else book.get('title', 'Book') %}
+{% set cover = book.cover_url if book is mapping else book.get('cover_url') %}
+{% if cover and cover.startswith('uploads/') %}
+{% set cover_src = url_for('static', filename=cover) %}
+{% elif cover %}
+{% set cover_src = cover %}
+{% endif %}
+<div class="book-cover book-cover-{{ size }}" title="{{ title }}">
+    {% if cover %}
+    <img src="{{ cover_src }}" alt="{{ title }}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+    {% endif %}
+    <div class="book-cover-placeholder" {% if cover %}style="display:none"{% endif %}>
+        {% if isbn %}
+        <img src="https://covers.openlibrary.org/b/isbn/{{ isbn }}-M.jpg" alt="{{ title }}" loading="lazy" onerror="this.parentElement.innerHTML='<i class=\'fas fa-book\'></i>';">
+        {% else %}
+        <i class="fas fa-book"></i>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}

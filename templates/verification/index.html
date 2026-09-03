@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% from 'macros/ui.html' import csrf_field %}
+{% from 'macros/pagination.html' import render_pagination %}
+
+{% block page_actions %}
+
+<button class="btn-primary-square" data-open-modal="verify-modal"><i class="fas fa-id-card"></i> Verify ID</button>
+
+{% endblock %}
+
+{% block content %}
+
+{% if lookup %}
+
+<div class="status-card status-card-{{ lookup.card_info.level }} mb-6">
+
+    <div class="status-card-icon">
+
+        <i class="fas fa-{% if lookup.card_info.level == 'success' %}circle-check{% elif lookup.card_info.level == 'warning' %}triangle-exclamation{% else %}circle-xmark{% endif %}"></i>
+
+    </div>
+
+    <div class="status-card-body">
+
+        <h3>{{ lookup.full_name }} <span class="text-muted">({{ lookup.library_id }})</span></h3>
+
+        <p class="status-card-label">{{ lookup.card_info.label }}</p>
+
+        <p class="status-card-msg">{{ lookup.card_info.message }}</p>
+
+        {% if lookup.card_expiry %}<p class="text-muted" style="font-size:0.8125rem;margin-top:0.25rem;">Expiry: {{ lookup.card_expiry }}</p>{% endif %}
+
+    </div>
+
+</div>
+
+{% endif %}
+
+
+
+<div class="page-card overflow-hidden">
+
+    <div class="page-card-header"><i class="fas fa-users"></i> Registered Users</div>
+
+    <table class="data-table">
+
+        <thead>
+
+            <tr>
+
+                <th>Name</th>
+
+                <th>Library ID</th>
+
+                <th>Barcode</th>
+
+                <th>Role</th>
+
+                <th>Status</th>
+
+                <th>Expiry</th>
+
+                <th>Action</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for user in users %}
+
+            <tr>
+
+                <td><strong>{{ user.full_name }}</strong></td>
+
+                <td>{{ user.library_id }}</td>
+
+                <td>{{ user.barcode or '—' }}</td>
+
+                <td>{{ user.role }}</td>
+
+                <td>
+
+                    <span class="status-card-inline status-card-{{ user.card_info.level }}">{{ user.card_info.label }}</span>
+
+                </td>
+
+                <td>{{ user.card_expiry or '—' }}</td>
+
+                <td>
+
+                    {% if has_perm('verification.manage') %}
+
+                    <button class="btn-action primary" data-open-modal="status-modal-{{ user.id }}">Update</button>
+
+                    {% else %}
+
+                    <span class="text-muted" style="font-size:0.8rem;">View only</span>
+
+                    {% endif %}
+
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+    {{ render_pagination(pagination) }}
+
+</div>
+
+{% endblock %}
+
+
+
+{% block modals %}
+
+<div id="verify-modal" class="modal">
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-dialog">
+
+        <div class="modal-header">
+
+            <h3 class="modal-title">Verify Library ID</h3>
+
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+
+        </div>
+
+        <form method="GET" action="{{ url_for('verification.index') }}">
+
+            <div class="modal-body">
+
+                <div class="form-group">
+
+                    <label class="form-label">Barcode or Library ID</label>
+
+                    <input type="text" name="code" value="{{ code }}" class="form-control" placeholder="Scan or enter ID...">
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+
+                <button type="submit" class="btn-primary-square">Verify</button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+
+{% if has_perm('verification.manage') %}
+
+{% for user in users %}
+
+<div id="status-modal-{{ user.id }}" class="modal">
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-dialog">
+
+        <div class="modal-header">
+
+            <h3 class="modal-title">Update Card Status</h3>
+
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+
+        </div>
+
+        <form method="POST" action="{{ url_for('verification.set_status', user_id=user.id) }}">
+
+            {{ csrf_field() }}
+
+            <div class="modal-body">
+
+                <p style="font-size:0.875rem;margin-bottom:1rem;"><strong>{{ user.full_name }}</strong> ({{ user.library_id }})</p>
+
+                <div class="form-group">
+
+                    <label class="form-label">Card Status</label>
+
+                    <select name="card_status" class="form-control">
+
+                        <option value="active" {% if user.card_status == 'active' %}selected{% endif %}>Active</option>
+
+                        <option value="suspended" {% if user.card_status == 'suspended' %}selected{% endif %}>Suspended</option>
+
+                        <option value="expired" {% if user.card_status == 'expired' %}selected{% endif %}>Expired</option>
+
+                        <option value="inactive" {% if user.card_status == 'inactive' %}selected{% endif %}>Inactive</option>
+
+                    </select>
+
+                </div>
+
+                <div class="form-group">
+
+                    <label class="form-label">Card Expiry</label>
+
+                    <input type="date" name="card_expiry" value="{{ user.card_expiry }}" class="form-control">
+
+                </div>
+
+                <div class="form-group">
+
+                    <label class="form-label">Reason <span class="text-danger">*</span></label>
+
+                    <textarea name="reason" class="form-control" rows="2" required placeholder="Why is this card status being changed?"></textarea>
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+
+                <button type="submit" class="btn-primary-square">Save Changes</button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endfor %}
+
+{% endif %}
+
+{% endblock %}
+

@@ -1,0 +1,42 @@
+{
+  "tips": {
+    "patron": [
+      "Press Ctrl+K to open quick search from anywhere in the system.",
+      "Return books on or before the due date to avoid overdue fines.",
+      "Can't find a book on the shelf? Place a reservation to join the hold queue.",
+      "Browse e-books for digital reading — your progress is saved automatically.",
+      "Renew eligible loans from Borrowing Logs before the due date (max 2 renewals).",
+      "Use genre filters in Search to discover books in your favorite categories.",
+      "Check the dashboard for items due soon so you never miss a return date."
+    ],
+    "staff": [
+      "Use barcode scan fields on Inventory and Borrowing for faster checkout.",
+      "Review the clearance checklist before approving graduation requests.",
+      "Low-stock badges highlight titles with high reservation demand.",
+      "Export reports to CSV from the Reports module for record-keeping.",
+      "Update a patron's card status from ID Verification when cards expire.",
+      "Fulfill ready reservations promptly — holds expire after the pickup window."
+    ],
+    "admin": [
+      "Set the Book of the Week from the dashboard to highlight staff picks.",
+      "Monitor overdue loans and unpaid fines from the dashboard analytics.",
+      "Use bulk inventory tools to keep the catalog up to date.",
+      "Review lost/damaged reports and resolve them to unblock clearance.",
+      "Check module analytics charts for borrowing trends across genres."
+    ],
+    "all": [
+      "The library is open for learning — explore something new today!",
+      "Did you know? Reading for 20 minutes a day builds a lifelong habit.",
+      "Libraries hold more than books — discover e-books, reports, and more."
+    ]
+  },
+  "trivia": [
+    "The Library of Alexandria, founded around 295 BCE, was one of the ancient world's largest knowledge centers.",
+    "The word 'library' comes from the Latin 'liber', meaning book.",
+    "The Guinness World Record for the largest library is the Library of Congress with over 170 million items.",
+    "The first public library in the Philippines was established during the Spanish colonial period.",
+    "ISBN stands for International Standard Book Number — every published book has a unique one.",
+    "E-books now account for a significant share of library lending worldwide.",
+    "The Dewey Decimal System, created in 1876, is still used to organize books in many libraries."
+  ]
+}

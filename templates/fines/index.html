@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from 'macros/ui.html' import csrf_field %}
+{% from 'macros/pagination.html' import render_pagination %}
+{% block content %}
+<div class="reminder-box">
+    <p><strong>REMINDER:</strong> Unpaid fines will block reservations and library clearance. Fine rate: ₱10.00 per day overdue.</p>
+</div>
+
+{% if fine_stats %}
+<div class="grid-4 mb-6">
+    <div class="stat-card stat-emerald">
+        <div class="stat-card-inner">
+            <div class="stat-body">
+                <p class="stat-label">Fines Paid This Semester</p>
+                <p class="stat-value emerald">₱{{ '%.2f'|format(fine_stats.paid_semester) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="stat-card stat-indigo">
+        <div class="stat-card-inner">
+            <div class="stat-body">
+                <p class="stat-label">On-Time Returns</p>
+                <p class="stat-value indigo">{{ fine_stats.on_time_returns }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="stat-card stat-red">
+        <div class="stat-card-inner">
+            <div class="stat-body">
+                <p class="stat-label">Unpaid Balance</p>
+                <p class="stat-value red">₱{{ '%.2f'|format(fine_stats.unpaid) }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="page-card overflow-hidden">
+    <div class="page-card-header"><i class="fas fa-coins"></i> Fines Record</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                {% if current_user.role != 'patron' %}<th>Patron</th>{% endif %}
+                <th>Reason</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fine in fines %}
+            <tr>
+                {% if current_user.role != 'patron' %}
+                <td>{{ fine.full_name }} ({{ fine.library_id }})</td>
+                {% endif %}
+                <td>
+                    {{ fine.reason }}
+                    {% if fine.breakdown.days %}
+                    <span class="fine-tooltip" title="₱{{ '%.2f'|format(fine.breakdown.rate) }} × {{ fine.breakdown.days }} days = ₱{{ '%.2f'|format(fine.amount) }}">
+                        <i class="fas fa-circle-info"></i>
+                    </span>
+                    {% endif %}
+                </td>
+                <td><strong>₱{{ '%.2f'|format(fine.amount) }}</strong></td>
+                <td><span class="status-badge {% if fine.status == 'unpaid' %}unavailable{% else %}available{% endif %}">{{ fine.status }}</span></td>
+                <td>{{ fine.created_at.strftime('%b %d, %Y') if fine.created_at else '—' }}</td>
+                <td>
+                    {% if fine.status == 'unpaid' and current_user.role in ['staff', 'admin'] %}
+                    <button class="btn-action primary" data-open-modal="pay-modal-{{ fine.id }}">Record Payment</button>
+                    {% if has_perm('fines.waive') %}
+                    <button class="btn-action accent" data-open-modal="waive-modal-{{ fine.id }}">Waive Fine</button>
+                    {% endif %}
+                    {% elif fine.status == 'unpaid' and current_user.role == 'patron' %}
+                    <button class="btn-action accent" data-open-modal="pay-online-modal-{{ fine.id }}">
+                        <i class="fas fa-credit-card"></i> Pay Online
+                    </button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="empty-cell">
+                <i class="fas fa-face-smile empty-icon"></i>
+                <p>No fines — nice work staying on time!</p>
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {{ render_pagination(pagination) }}
+</div>
+{% endblock %}
+
+{% block modals %}
+{% for fine in fines %}
+{% if fine.status == 'unpaid' and current_user.role in ['staff', 'admin'] %}
+<div id="pay-modal-{{ fine.id }}" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Record Payment</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('fines.pay', fine_id=fine.id) }}">
+            {{ csrf_field() }}
+            <div class="modal-body">
+                <p>Record payment of <strong>₱{{ '%.2f'|format(fine.amount) }}</strong> for:</p>
+                <p class="text-muted" style="font-size:0.875rem;">{{ fine.reason }}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-success">Confirm Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% if has_perm('fines.waive') %}
+<div id="waive-modal-{{ fine.id }}" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Waive Fine (Admin)</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('fines.waive', fine_id=fine.id) }}">
+            {{ csrf_field() }}
+            <div class="modal-body">
+                <p>Waive <strong>₱{{ '%.2f'|format(fine.amount) }}</strong> for {{ fine.full_name }}?</p>
+                <div class="form-group">
+                    <label class="form-label">Reason <span class="text-danger">*</span></label>
+                    <textarea name="reason" class="form-control" rows="3" required placeholder="Document why this fine is being waived…"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square">Confirm Waiver</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% elif fine.status == 'unpaid' and current_user.role == 'patron' %}
+<div id="pay-online-modal-{{ fine.id }}" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-credit-card"></i> Pay Fine Online</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('fines.pay_online', fine_id=fine.id) }}">
+            {{ csrf_field() }}
+            <div class="modal-body">
+                <p>Simulated online payment for <strong>₱{{ '%.2f'|format(fine.amount) }}</strong></p>
+                <p class="text-muted" style="font-size:0.8125rem;">{{ fine.reason }}</p>
+                <div class="mock-payment-card">
+                    <i class="fas fa-lock"></i> Secure payment simulation — no real charge
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square"><i class="fas fa-check"></i> Pay ₱{{ '%.2f'|format(fine.amount) }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}

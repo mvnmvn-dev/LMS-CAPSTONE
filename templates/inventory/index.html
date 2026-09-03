@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+{% from 'macros/pagination.html' import render_pagination %}
+{% block page_actions %}
+<form method="GET" action="{{ url_for('inventory.index') }}" class="scan-lookup-form">
+    <input type="text" name="scan" value="{{ scan_code }}" class="form-control scan-input" placeholder="Scan barcode / ISBN…" autofocus>
+    <button type="submit" class="btn-primary-square scan-lookup-btn"><i class="fas fa-barcode"></i> Lookup</button>
+</form>
+<button class="btn-primary-square" data-open-modal="search-modal"><i class="fas fa-search"></i> Search</button>
+<button class="btn-primary-square" data-open-modal="add-book-modal"><i class="fas fa-plus"></i> Add Book</button>
+{% endblock %}
+{% block content %}
+{% from 'macros/book.html' import book_cover %}
+<div class="page-card overflow-hidden">
+    <div class="page-card-header"><i class="fas fa-book-open"></i> Book List</div>
+    <div class="table-wrap">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Title</th>
+                <th>ISBN</th>
+                <th>Authors</th>
+                <th>Genre</th>
+                <th>Copies</th>
+                <th>Available</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for book in books %}
+            <tr>
+                <td>{{ book_cover(book, 'xs') }}</td>
+                <td>
+                    <strong>{{ book.title }}</strong>
+                    {% if book.available_copies == 0 and book.pending_holds > 0 %}
+                    <span class="demand-badge high-demand"><i class="fas fa-fire"></i> High demand</span>
+                    {% elif book.available_copies is not none and book.available_copies <= 1 and book.total_copies > 1 %}
+                    <span class="demand-badge low-stock"><i class="fas fa-box-open"></i> Low stock</span>
+                    {% endif %}
+                </td>
+                <td>{{ book.isbn or '—' }}</td>
+                <td>{{ book.authors or '—' }}</td>
+                <td>{{ book.genre or '—' }}</td>
+                <td>{{ book.total_copies or 0 }}</td>
+                <td>
+                    {% if book.available_copies and book.available_copies > 0 %}
+                    <span class="status-badge available">{{ book.available_copies }} available</span>
+                    {% else %}
+                    <span class="status-badge unavailable">Out of stock</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <button type="button" class="btn-action primary" data-inventory-detail="{{ book.id }}">View</button>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="empty-cell">
+                <i class="fas fa-books empty-icon"></i>
+                <p>No books in inventory yet — add your first title!</p>
+                <button class="btn-primary-square" data-open-modal="add-book-modal">Add Book</button>
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {{ render_pagination(pagination) }}
+</div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Search Modal -->
+<div id="search-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Search Books</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="GET" action="{{ url_for('inventory.index') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Keyword</label>
+                    <input type="text" name="q" value="{{ request.args.get('q', '') }}" class="form-control" placeholder="Title, ISBN, author...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square">Search</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Book Modal -->
+<div id="add-book-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+            <h3 class="modal-title">Add New Book</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('inventory.add') }}" enctype="multipart/form-data">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Cover Image</label>
+                    <input type="file" name="cover_image" id="add-cover-image" class="form-control" accept="image/jpeg,image/png,image/webp,image/gif">
+                    <p class="form-hint">JPG, PNG, WEBP, or GIF. Max 2 MB.</p>
+                    <div class="book-cover-upload-preview" id="add-cover-preview" hidden>
+                        <img src="" alt="Cover preview" id="add-cover-preview-img">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Title *</label>
+                    <input type="text" name="title" class="form-control" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">ISBN</label>
+                        <input type="text" name="isbn" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Genre</label>
+                        <input type="text" name="genre" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Publisher</label>
+                    <input type="text" name="publisher" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Authors (comma-separated)</label>
+                    <input type="text" name="authors" class="form-control" placeholder="Author One, Author Two">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Copy Barcodes (comma-separated)</label>
+                    <input type="text" name="barcodes" class="form-control" placeholder="CPY-001, CPY-002">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" rows="3" class="form-control"></textarea>
+                </div>
+                <label class="form-check">
+                    <input type="checkbox" name="has_ebook"> Has E-Book format
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square">Save Book</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Book Detail Modal -->
+<div id="inventory-detail-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-xl">
+        <div class="modal-header">
+            <h3 class="modal-title" id="inventory-detail-title">Book Details</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <div class="modal-body" id="inventory-detail-body">
+            <div class="book-detail-loading">
+                <div class="spinner"></div>
+                <p>Loading book details…</p>
+            </div>
+        </div>
+        <div class="modal-footer" id="inventory-detail-footer" style="display:none;"></div>
+    </div>
+</div>
+
+<!-- Edit Book Modal -->
+<div id="edit-book-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+            <h3 class="modal-title">Edit Book</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form id="edit-book-form" method="POST" enctype="multipart/form-data">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Cover Image</label>
+                    <div class="book-cover-upload-preview" id="edit-cover-current" hidden>
+                        <img src="" alt="Current cover" id="edit-cover-current-img">
+                        <p class="form-hint">Current cover</p>
+                    </div>
+                    <input type="file" name="cover_image" id="edit-cover-image" class="form-control" accept="image/jpeg,image/png,image/webp,image/gif">
+                    <p class="form-hint">Upload a new image to replace the current cover. Max 2 MB.</p>
+                    <div class="book-cover-upload-preview" id="edit-cover-preview" hidden>
+                        <img src="" alt="New cover preview" id="edit-cover-preview-img">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Title *</label>
+                    <input type="text" name="title" id="edit-title" class="form-control" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">ISBN</label>
+                        <input type="text" name="isbn" id="edit-isbn" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Genre</label>
+                        <input type="text" name="genre" id="edit-genre" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Publisher</label>
+                    <input type="text" name="publisher" id="edit-publisher" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" id="edit-description" rows="3" class="form-control"></textarea>
+                </div>
+                <label class="form-check">
+                    <input type="checkbox" name="has_ebook" id="edit-has-ebook"> Has E-Book format
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square">Update Book</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Copy Modal -->
+<div id="add-copy-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Add Physical Copy</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <form id="add-copy-form" method="POST">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Barcode *</label>
+                    <input type="text" name="barcode" class="form-control" required placeholder="CPY-001">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">RFID Tag</label>
+                    <input type="text" name="rfid_tag" class="form-control" placeholder="Optional">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn-primary-square">Add Copy</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+{% if current_user.role == 'admin' %}
+<form id="delete-book-form" method="POST" style="display:none;"></form>
+<div id="delete-book-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Delete Book</h3>
+            <button type="button" class="modal-close" data-close-modal>&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete <strong id="delete-book-name"></strong>? This cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" data-close-modal>Cancel</button>
+            <button type="button" class="btn-danger" onclick="document.getElementById('delete-book-form').submit()">Delete</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.LMS_IS_ADMIN = {{ 'true' if current_user.role == 'admin' else 'false' }};
+window.LMS_OPEN_BOOK_ID = {{ open_book_id|tojson if open_book_id else 'null' }};
+
+let currentInventoryBook = null;
+
+function inventoryEscape(str) {
+    const div = document.createElement('div');
+    div.textContent = str ?? '';
+    return div.innerHTML;
+}
+
+function copyStatusClass(status) {
+    return status === 'available' ? 'available' : 'unavailable';
+}
+
+function resolveCoverUrl(coverUrl) {
+    if (!coverUrl) return '';
+    if (coverUrl.startsWith('http') || coverUrl.startsWith('/')) return coverUrl;
+    if (coverUrl.startsWith('uploads/')) return `/static/${coverUrl}`;
+    return coverUrl;
+}
+
+function setupCoverPreview(inputId, previewId, imgId) {
+    const input = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    const img = document.getElementById(imgId);
+    if (!input || !preview || !img) return;
+
+    input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (!file) {
+            preview.hidden = true;
+            img.removeAttribute('src');
+            return;
+        }
+        img.src = URL.createObjectURL(file);
+        preview.hidden = false;
+    });
+}
+
+function populateEditForm(book) {
+    document.getElementById('edit-title').value = book.title || '';
+    document.getElementById('edit-isbn').value = book.isbn || '';
+    document.getElementById('edit-genre').value = book.genre || '';
+    document.getElementById('edit-publisher').value = book.publisher || '';
+    document.getElementById('edit-description').value = book.description || '';
+    document.getElementById('edit-has-ebook').checked = !!book.has_ebook;
+    document.getElementById('edit-book-form').action = `/inventory/${book.id}/edit`;
+
+    const coverInput = document.getElementById('edit-cover-image');
+    if (coverInput) coverInput.value = '';
+
+    const currentWrap = document.getElementById('edit-cover-current');
+    const currentImg = document.getElementById('edit-cover-current-img');
+    const newPreview = document.getElementById('edit-cover-preview');
+    const newPreviewImg = document.getElementById('edit-cover-preview-img');
+    if (newPreview) newPreview.hidden = true;
+    if (newPreviewImg) newPreviewImg.removeAttribute('src');
+
+    if (currentWrap && currentImg) {
+        const src = resolveCoverUrl(book.cover_url);
+        if (src) {
+            currentImg.src = src;
+            currentWrap.hidden = false;
+        } else {
+            currentImg.removeAttribute('src');
+            currentWrap.hidden = true;
+        }
+    }
+}
+
+function setupInventoryForms(book) {
+    populateEditForm(book);
+    document.getElementById('add-copy-form').action = `/inventory/${book.id}/copy`;
+    const deleteForm = document.getElementById('delete-book-form');
+    if (deleteForm) {
+        deleteForm.action = `/inventory/${book.id}/delete`;
+        const nameEl = document.getElementById('delete-book-name');
+        if (nameEl) nameEl.textContent = book.title;
+    }
+}
+
+function renderInventoryDetail(book) {
+    const body = document.getElementById('inventory-detail-body');
+    const footer = document.getElementById('inventory-detail-footer');
+    const title = document.getElementById('inventory-detail-title');
+    const copies = book.copies || [];
+
+    title.textContent = book.title;
+
+    const copiesHtml = copies.length
+        ? copies.map(copy => `
+            <li class="inventory-copy-item">
+                <span>${inventoryEscape(copy.barcode)}</span>
+                <span class="status-badge ${copyStatusClass(copy.status)}">${inventoryEscape(copy.status)}</span>
+            </li>`).join('')
+        : '<li class="empty-cell">No copies yet</li>';
+
+    body.innerHTML = `
+        <div class="inventory-detail-grid">
+            <div class="inventory-detail-panel">
+                <h4 class="inventory-detail-heading">${inventoryEscape(book.title)}</h4>
+                <p class="inventory-detail-meta">ISBN: ${inventoryEscape(book.isbn || 'N/A')} | Genre: ${inventoryEscape(book.genre || 'N/A')}</p>
+                <p class="inventory-detail-desc">${inventoryEscape(book.description || 'No description.')}</p>
+                <p class="inventory-detail-line"><strong>Authors:</strong> ${inventoryEscape(book.authors || 'Unknown')}</p>
+                <p class="inventory-detail-line"><strong>Publisher:</strong> ${inventoryEscape(book.publisher || 'N/A')}</p>
+            </div>
+            <div class="inventory-detail-panel">
+                <div class="inventory-copies-header">
+                    <span><i class="fas fa-barcode"></i> Physical Copies</span>
+                    <button type="button" class="btn-primary-square btn-sm" data-open-modal="add-copy-modal">
+                        <i class="fas fa-plus"></i> Add Copy
+                    </button>
+                </div>
+                <ul class="inventory-copies-list">${copiesHtml}</ul>
+            </div>
+        </div>`;
+
+    let footerHtml = `
+        <button type="button" class="btn-primary-square" data-open-modal="edit-book-modal">
+            <i class="fas fa-pen"></i> Edit
+        </button>`;
+    if (window.LMS_IS_ADMIN) {
+        footerHtml += `
+        <button type="button" class="btn-danger" data-open-modal="delete-book-modal">
+            <i class="fas fa-trash"></i> Delete
+        </button>`;
+    }
+    footerHtml += `<button type="button" class="btn-secondary" data-close-modal>Close</button>`;
+    footer.innerHTML = footerHtml;
+    footer.style.display = 'flex';
+
+    footer.querySelectorAll('[data-open-modal]').forEach(btn => {
+        btn.addEventListener('click', () => openModal(btn.dataset.openModal));
+    });
+    footer.querySelectorAll('[data-close-modal]').forEach(btn => {
+        btn.addEventListener('click', () => closeModal('inventory-detail-modal'));
+    });
+    body.querySelectorAll('[data-open-modal]').forEach(btn => {
+        btn.addEventListener('click', () => openModal(btn.dataset.openModal));
+    });
+}
+
+async function openInventoryDetail(bookId) {
+    const body = document.getElementById('inventory-detail-body');
+    const footer = document.getElementById('inventory-detail-footer');
+    body.innerHTML = `
+        <div class="book-detail-loading">
+            <div class="spinner"></div>
+            <p>Loading book details…</p>
+        </div>`;
+    footer.style.display = 'none';
+    openModal('inventory-detail-modal');
+
+    try {
+        const res = await fetch(`/api/v1/books/${bookId}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+            currentInventoryBook = data.data;
+            setupInventoryForms(currentInventoryBook);
+            renderInventoryDetail(currentInventoryBook);
+        } else {
+            body.innerHTML = `
+                <div class="book-detail-error">
+                    <i class="fas fa-circle-exclamation"></i>
+                    <p>${inventoryEscape(data.message || 'Could not load book details.')}</p>
+                </div>`;
+        }
+    } catch {
+        body.innerHTML = `
+            <div class="book-detail-error">
+                <i class="fas fa-circle-exclamation"></i>
+                <p>Something went wrong. Please try again.</p>
+            </div>`;
+    }
+}
+
+document.querySelectorAll('[data-inventory-detail]').forEach(btn => {
+    btn.addEventListener('click', () => openInventoryDetail(btn.dataset.inventoryDetail));
+});
+
+if (window.LMS_OPEN_BOOK_ID) {
+    openInventoryDetail(window.LMS_OPEN_BOOK_ID);
+}
+
+setupCoverPreview('add-cover-image', 'add-cover-preview', 'add-cover-preview-img');
+setupCoverPreview('edit-cover-image', 'edit-cover-preview', 'edit-cover-preview-img');
+</script>
+{% endblock %}

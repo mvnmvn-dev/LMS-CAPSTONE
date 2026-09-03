@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="reader-shell" id="reader-shell">
+    <div class="reader-toolbar">
+        <div>
+            <h2 class="reader-title">{{ ebook.title }}</h2>
+            <p class="reader-meta">{{ ebook.format }} · Access until {{ ebook.expires_at.strftime('%b %d, %Y %I:%M %p') }}</p>
+            <div class="reader-access-bar">
+                <div class="reader-access-fill" id="access-time-bar"></div>
+            </div>
+            <span class="reader-access-label" id="access-time-label">Time remaining</span>
+        </div>
+        <div class="reader-controls">
+            <button type="button" class="btn-action" data-theme="light" title="Light mode"><i class="fas fa-sun"></i></button>
+            <button type="button" class="btn-action" data-theme="sepia" title="Sepia mode"><i class="fas fa-book"></i></button>
+            <button type="button" class="btn-action" data-theme="dark" title="Dark mode"><i class="fas fa-moon"></i></button>
+            <button type="button" class="btn-action" id="font-decrease" title="Smaller font">A-</button>
+            <button type="button" class="btn-action" id="font-increase" title="Larger font">A+</button>
+            <a href="{{ url_for('ebooks.index') }}" class="btn-secondary">Back</a>
+        </div>
+    </div>
+    <div class="reader-viewport reader-theme-light" id="reader-viewport">
+        <i class="fas fa-book-open reader-icon"></i>
+        <p class="reader-text">E-Book Reader — {{ ebook.format }} format</p>
+        <p class="reader-file text-muted">File: {{ ebook.file_path }}</p>
+        <p class="reader-hint">Simulated reader with theme and font controls. Progress is saved automatically.</p>
+        <div class="reader-progress-control">
+            <label>Reading progress</label>
+            <input type="range" id="progress-slider" min="0" max="100" value="5">
+            <span id="progress-label">5%</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const accessId = {{ ebook.id }};
+const expiresAt = new Date("{{ ebook.expires_at.strftime('%Y-%m-%dT%H:%M:%S') if ebook.expires_at else '' }}");
+const progressUrl = {{ url_for('ebooks.save_progress', access_id=ebook.id)|tojson }};
+
+function updateAccessBar() {
+    const now = Date.now();
+    const total = expiresAt - now;
+    const granted = expiresAt - (now - 72 * 3600000);
+    const pct = Math.max(0, Math.min(100, (total / (72 * 3600000)) * 100));
+    document.getElementById('access-time-bar').style.width = pct + '%';
+    const hrs = Math.max(0, Math.floor(total / 3600000));
+    document.getElementById('access-time-label').textContent = hrs + ' hours remaining';
+}
+updateAccessBar();
+setInterval(updateAccessBar, 60000);
+
+const viewport = document.getElementById('reader-viewport');
+document.querySelectorAll('[data-theme]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        viewport.className = 'reader-viewport reader-theme-' + btn.dataset.theme;
+    });
+});
+
+let fontSize = 16;
+document.getElementById('font-increase').onclick = () => { fontSize += 2; viewport.style.fontSize = fontSize + 'px'; };
+document.getElementById('font-decrease').onclick = () => { fontSize = Math.max(12, fontSize - 2); viewport.style.fontSize = fontSize + 'px'; };
+
+const slider = document.getElementById('progress-slider');
+const label = document.getElementById('progress-label');
+slider.addEventListener('input', () => { label.textContent = slider.value + '%'; });
+slider.addEventListener('change', async () => {
+    await fetch(progressUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progress_pct: parseInt(slider.value, 10) }),
+    });
+});
+</script>
+{% endblock %}

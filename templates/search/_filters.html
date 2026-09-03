@@ -1,0 +1,79 @@
+<div class="search-filter-panel" id="search-filter-panel">
+    <div class="search-filter-panel-header">
+        {% if query or genre or available_only or ebook_only %}
+        <a href="{{ url_for('search.index') }}" class="search-filter-clear" data-search-ajax-link>
+            <i class="fas fa-rotate-left"></i> Reset filters
+        </a>
+        {% else %}
+        <span class="search-filter-panel-hint">Use the fields below to narrow your search</span>
+        {% endif %}
+    </div>
+    <form method="GET" action="{{ url_for('search.index') }}" class="search-filter-search-form" data-search-ajax-form>
+        {% if genre %}<input type="hidden" name="genre" value="{{ genre }}">{% endif %}
+        {% if available_only %}<input type="hidden" name="available" value="1">{% endif %}
+        {% if ebook_only %}<input type="hidden" name="ebook" value="1">{% endif %}
+        <div class="search-filter-search-wrap">
+            <i class="fas fa-search search-filter-search-icon"></i>
+            <input type="search" name="q" value="{{ query }}" class="search-filter-search-input" placeholder="Search by title, author, or ISBN…" autocomplete="off">
+            <button type="submit" class="search-filter-search-btn">Search</button>
+        </div>
+    </form>
+
+    <div class="search-filter-groups">
+        <div class="search-filter-group">
+            <span class="search-filter-group-label"><i class="fas fa-tags"></i> Genre</span>
+            <div class="search-filter-chips">
+                <a href="{{ url_for('search.index', q=query or none, available='1' if available_only else none, ebook='1' if ebook_only else none) }}"
+                   class="search-filter-chip {% if not genre %}is-active{% endif %}" data-search-ajax-link>
+                    <i class="fas fa-layer-group"></i> All
+                </a>
+                {% for g in genres[:10] %}
+                <a href="{{ url_for('search.index', q=query or none, genre=g, available='1' if available_only else none, ebook='1' if ebook_only else none) }}"
+                   class="search-filter-chip {% if genre == g %}is-active{% endif %}" data-search-ajax-link>
+                    <i class="fas fa-bookmark"></i> {{ g }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="search-filter-group">
+            <span class="search-filter-group-label"><i class="fas fa-filter"></i> Quick filters</span>
+            <div class="search-filter-chips">
+                <a href="{{ url_for('search.index', q=query or none, genre=genre or none, available=none if available_only else '1', ebook='1' if ebook_only else none) }}"
+                   class="search-filter-chip search-filter-chip-toggle {% if available_only %}is-active{% endif %}" data-search-ajax-link>
+                    <i class="fas fa-circle-check"></i> Available only
+                </a>
+                <a href="{{ url_for('search.index', q=query or none, genre=genre or none, available='1' if available_only else none, ebook=none if ebook_only else '1') }}"
+                   class="search-filter-chip search-filter-chip-toggle {% if ebook_only %}is-active{% endif %}" data-search-ajax-link>
+                    <i class="fas fa-tablet-screen-button"></i> Has E-Book
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if query or genre or available_only or ebook_only %}
+    <div class="search-active-filters">
+        <span class="search-active-filters-label">Active:</span>
+        {% if query %}
+        <a href="{{ url_for('search.index', genre=genre or none, available='1' if available_only else none, ebook='1' if ebook_only else none) }}" class="search-active-tag" data-search-ajax-link>
+            <i class="fas fa-search"></i> "{{ query }}" <i class="fas fa-xmark"></i>
+        </a>
+        {% endif %}
+        {% if genre %}
+        <a href="{{ url_for('search.index', q=query or none, available='1' if available_only else none, ebook='1' if ebook_only else none) }}" class="search-active-tag" data-search-ajax-link>
+            <i class="fas fa-tag"></i> {{ genre }} <i class="fas fa-xmark"></i>
+        </a>
+        {% endif %}
+        {% if available_only %}
+        <a href="{{ url_for('search.index', q=query or none, genre=genre or none, ebook='1' if ebook_only else none) }}" class="search-active-tag" data-search-ajax-link>
+            <i class="fas fa-circle-check"></i> Available only <i class="fas fa-xmark"></i>
+        </a>
+        {% endif %}
+        {% if ebook_only %}
+        <a href="{{ url_for('search.index', q=query or none, genre=genre or none, available='1' if available_only else none) }}" class="search-active-tag" data-search-ajax-link>
+            <i class="fas fa-tablet-screen-button"></i> Has E-Book <i class="fas fa-xmark"></i>
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
